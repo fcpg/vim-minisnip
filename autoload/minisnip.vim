@@ -1,14 +1,23 @@
-function! minisnip#ShouldTrigger()
-    silent! unlet! s:snippetfile
-    let l:cword = matchstr(getline('.'), '\v\f+%' . col('.') . 'c')
 
+function! minisnip#ExprMap(type) abort
+    let l:pfx = a:type=='i' ? "x\<bs>" : ""
+    let l:untriggered = g:minisnip_triggerornop
+          \ ? ''
+          \ : eval('"' . escape(g:minisnip_trigger, '\"<') . '"')
+    let l:ret = minisnip#ShouldTrigger()
+            \ ? pfx."\<esc>:call \minisnip#Minisnip()\<cr>"
+            \ : l:untriggered
+    return l:ret
+endfun
+
+function! minisnip#ShouldExpand(cword) abort
     " look for a snippet by that name
     for l:dir in split(g:minisnip_dir, ':')
-        let l:snippetfile = l:dir . '/' . l:cword
+        let l:snippetfile = l:dir . '/' . a:cword
 
         " filetype snippets override general snippets
         for l:filetype in split(&filetype, '\.')
-          let l:ft_snippetfile = l:dir . '/_' . l:filetype . '_' . l:cword
+          let l:ft_snippetfile = l:dir . '/_' . l:filetype . '_' . a:cword
           if filereadable(l:ft_snippetfile)
               let l:snippetfile = l:ft_snippetfile
               break
@@ -21,12 +30,27 @@ function! minisnip#ShouldTrigger()
             return 1
         endif
     endfor
+    return 0
+endfun
 
-    return search(g:minisnip_delimpat, 'e')
+function! minisnip#ShouldJump() abort
+    let ret = search(g:minisnip_delimpat, 'e')
+    " echom "shouldjump:" ret
+    return ret
+endfun
+
+function! minisnip#ShouldTrigger() abort
+    unlet! s:snippetfile
+    let l:cword = matchstr(getline('.'), '\v\f+%' . col('.') . 'c')
+
+    let ret = minisnip#ShouldExpand(l:cword) || minisnip#ShouldJump()
+    " echom "shouldtrigger:" ret
+    return ret
 endfunction
 
 " main function, called on press of Tab (or whatever key Minisnip is bound to)
-function! minisnip#Minisnip()
+function! minisnip#Minisnip() abort
+    " echom "Minisnip"
     if exists("s:snippetfile")
         " reset placeholder text history (for backrefs)
         let s:placeholder_texts = []
@@ -54,7 +78,8 @@ function! minisnip#Minisnip()
 endfunction
 
 " this is the function that finds and selects the next placeholder
-function! s:SelectPlaceholder()
+function! s:SelectPlaceholder() abort
+    " echom "SelectPlaceholder"
     " don't clobber s register
     let l:old_s = @s
 
